@@ -1,40 +1,74 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
+const { getOldDates } = require("../../commonUtils");
 
-router.get("/", function (req, res) {
-    const stocks = ["aapl", "msft"];
+router.get("/", async function (req, res) {
+    const dateType = await getOldDates(req.query.dateType)
+    const stocks = req.query.stockType;
     let stockApis = [];
-    
+
     stocks.forEach(stock => {
-        let url = axios.get(`https://api.tiingo.com/tiingo/daily/${stock}/prices?startDate=2020-10-28&token=${process.env.API_KEY}`)
-        stockApis.push(url);
+        let stockObject = {}
+        let url = axios.get(`https://api.tiingo.com/tiingo/daily/${stock}/prices?startDate=${dateType}&token=${process.env.API_KEY}`)
+        let tickerInfo = axios.get(`https://api.tiingo.com/tiingo/daily/${stock}?token=${process.env.API_KEY}`)
+        stockObject.url = url;
+        stockObject.tickerInfo = tickerInfo;
+        stockApis.push(stockObject);
     })
     
     Promise.all(stockApis).then(data => {
-        return Promise.all(data.map(function (response) {
-            return response.data
+        return Promise.all(data.map(async response => {
+
+            let objectInfo = {};
+            let outputData = [];
+            let data = await response.url;
+
+            for(var i = 0; i < data.data.length; i++) {
+                var input = data.data[i];
+                outputData.push([new Date(input.date).getTime(), input.close]);
+            }
+            
+            const url2 = outputData;
+            const tickerInfo2 = await response.tickerInfo
+            objectInfo.stockInfo = outputData;
+            objectInfo.tickerInfo = tickerInfo2.data;
+            return objectInfo
         }));
     }).then(newData => {
-        console.log(newData);
         res.json(newData);
     }).catch(errors => {
         console.log(errors);
     })
+})
+
+router.get("/:id", async function (req, res) {
+    const stock = req.params.id;
+    const dateType = await getOldDates("yearly")
+
+    let url = axios.get(`https://api.tiingo.com/tiingo/daily/${stock}/prices?startDate=${dateType}&token=${process.env.API_KEY}`)
+    let tickerInfo = axios.get(`https://api.tiingo.com/tiingo/daily/${stock}?token=${process.env.API_KEY}`)
     
-    // axios({
-    //     method: "get",
-    //     url: `https://api.tiingo.com/tiingo/daily/aapl/prices?startDate=2020-09-27&token=${process.env.API_KEY}`,
-    //     contentType: "application/json; charset=utf-8"
-    // }).then((data) => {
-    //     if (data.status === 200) {
-    //         res.json(data.data);
-    //     } else {
-    //         res.json("Error");
-    //     }
-    // }).catch((error) => {
-    //     console.log(error);
-    // })
+    Promise.all([url, tickerInfo]).then(async response => {
+        let objectInfo = {};
+        let outputData = [];
+
+        let data = await response[0].data;
+        for(var i = 0; i < data.length; i++) {
+            var input = data[i];
+            outputData.push([new Date(input.date).getTime(), input.close]);
+        }
+
+        console.log(outputData, 'output');
+
+        objectInfo.stockInfo = outputData
+        objectInfo.tickerInfo = response[1].data;
+        return objectInfo
+    }).then(newData => {
+        res.json(newData);
+    }).catch(errors => {
+        console.log(errors);
+    })
 })
 
 module.exports = router;
