@@ -2,8 +2,9 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const { getOldDates } = require("../../commonUtils");
+const auth = require("../../middleware/auth");
 
-router.get("/", async function (req, res) {
+router.get("/", auth, async function (req, res) {
     const dateType = await getOldDates(req.query.dateType)
     const stocks = req.query.stockType;
     let stockApis = [];
@@ -42,7 +43,7 @@ router.get("/", async function (req, res) {
     })
 })
 
-router.get("/:id", async function (req, res) {
+router.get("/:id", auth, async function (req, res) {
     const stock = req.params.id;
     const dateType = await getOldDates("yearly")
 
@@ -59,14 +60,28 @@ router.get("/:id", async function (req, res) {
             outputData.push([new Date(input.date).getTime(), input.close]);
         }
 
-        console.log(outputData, 'output');
-
         objectInfo.stockInfo = outputData
         objectInfo.tickerInfo = response[1].data;
         return objectInfo
     }).then(newData => {
         res.json(newData);
     }).catch(errors => {
+        console.log(errors);
+    })
+})
+
+router.get("/general/news", auth, async function (req, res) {
+
+    axios.get(`https://newsapi.org/v2/top-headlines?country=us&apiKey=${process.env.STOCK_NEWS_API_KEY}`, {
+        headers: {
+            'Authorization' : `token ${process.env.STOCK_NEWS_API_KEY}`
+        }
+    }).then(response => {
+        if (response.status === 200) {
+            return res.json(response.data);
+        }
+    })
+    .catch(errors => {
         console.log(errors);
     })
 })
