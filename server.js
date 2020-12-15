@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const InitiateMongoServer = require("./server/config/dbconfig.js");
 const bodyParser = require('body-parser');
 const app = express();

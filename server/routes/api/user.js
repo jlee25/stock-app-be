@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
+const auth = require("../../middleware/auth");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
@@ -85,68 +86,77 @@ router.post(
 
 
 router.post(
-    "/login",
-    [
-        // username must be an email
-        body('email').isEmail(),
-        // password must be at least 5 chars long
-        body('password').isLength({ min: 5 })
-    ],
-    async (req, res) => {
-      const errors = validationResult(req);
-  
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          errors: errors.array()
-        });
-      }
-  
-      const { email, password } = req.body;
-      try {
-        let user = await User.findOne({
-          email
-        });
-        if (!user)
-          return res.status(400).json({
-            message: "User Not Exist"
-          });
-  
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch)
-          return res.status(400).json({
-            message: "Incorrect Password !"
-          });
-  
-        const payload = {
-          user: {
-            id: user.id
-          }
-        };
-  
-        jwt.sign(
-          payload,
-          "randomString",
-          {
-            expiresIn: new Date().setDate(new Date().getDate() + 1)
-          },
-          (err, token) => {
-            if (err) throw err;
-            res.cookie('access_token', token, { 
-                sameSite: "strict",
-                path: "/",
-                httpOnly: true,
-                expires: new Date(new Date().getTime + 100 * 1000)
-            });
-            res.status(200).json({ success: true });
-          }
-        );
-      } catch (e) {
-        console.error(e);
-        res.status(500).json({
-          message: "Server Error"
-        });
-      }
+  "/login",
+  [
+      // username must be an email
+      body('email').isEmail(),
+      // password must be at least 5 chars long
+      body('password').isLength({ min: 5 })
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        errors: errors.array()
+      });
     }
-  );
+
+    const { email, password } = req.body;
+    try {
+      let user = await User.findOne({
+        email
+      });
+      if (!user)
+        return res.status(400).json({
+          message: "User Not Exist"
+        });
+
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch)
+        return res.status(400).json({
+          message: "Incorrect Password !"
+        });
+
+      const payload = {
+        user: {
+          id: user.id
+        }
+      };
+
+      jwt.sign(
+        payload,
+        "randomString",
+        {
+          expiresIn: new Date().setDate(new Date().getDate() + 1)
+        },
+        (err, token) => {
+          if (err) throw err;
+          res.cookie('access_token', token, { 
+              sameSite: "strict",
+              path: "/",
+              httpOnly: true,
+              expires: new Date(new Date().getTime + 100 * 1000)
+          });
+          res.status(200).json({ success: true });
+        }
+      );
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({
+        message: "Server Error"
+      });
+    }
+  }
+);
+
+router.post("/logout", auth, async (req, res) => {
+  res.cookie('access_token', 'none', {
+    expires: new Date(Date.now()),
+    httpOnly: true,
+  })
+  res.status(200).json({ success: true, message: 'User logged out successfully' })
+  }
+);
 
 module.exports = router;
