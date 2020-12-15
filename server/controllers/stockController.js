@@ -20,22 +20,23 @@ async function getStockChartsData(stockArray, res) {
     Promise.all(stockApis).then(data => {
         return Promise.all(data.map(async response => {
 
-            console.log
-
+            
             let objectInfo = {};
             let outputData = [];
+            let details = [];
             let data = await response.url;
-
+            
             for(var i = 0; i < data.data.length; i++) {
                 var input = data.data[i];
                 outputData.push([new Date(input.date).getTime(), input.close]);
+                details.push([new Date(input.date).getTime(), input.close, input.high, input.low, input.open])
             }
             
             const url2 = outputData;
             const tickerInfo2 = await response.tickerInfo
             objectInfo.stockInfo = outputData;
             objectInfo.tickerInfo = tickerInfo2.data;
-            objectInfo.details = data.data;      
+            objectInfo.details = details;      
             return objectInfo
         }));
     }).then(newData => {
