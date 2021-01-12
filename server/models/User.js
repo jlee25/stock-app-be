@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const FavouriteSchema = require ('./Favourite');
 
 const UserSchema = mongoose.Schema({
   username: {
@@ -13,10 +14,7 @@ const UserSchema = mongoose.Schema({
     type: String,
     required: true
   },
-  favouriteTickers: {
-    type: Array,
-    default: []
-  },
+  favouriteTickers: [FavouriteSchema],
   createdAt: {
     type: Date,
     default: Date.now()

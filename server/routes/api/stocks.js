@@ -9,7 +9,7 @@ const Ticker = require("../../models/Ticker");
 let { getStockChartsData } = require("../../controllers/stockController");
 
 router.get("/", auth, async function (req, res) {
-    getStockChartsData(req.query.stockType, res);
+    getStockChartsData(req.query.stockType, res, false);
 })
 
 router.get("/:id", auth, async function (req, res) {
@@ -65,10 +65,10 @@ router.get("/general/search", auth, async function (req, res) {
     .then(async tickers => {
         await User.findOne({ _id: req.user.id }, {favouriteTickers: 1}).then(favTickers => {
             for (let i = 0; i < tickers.length; i++){
-                if (favTickers.favouriteTickers.includes(tickers[i]._id)){
-                    tickers[i].favourite = true
-                } else {
-                    tickers.favourite = false
+                for (let j = 0; j < favTickers.favouriteTickers.length; j++) {
+                    if (favTickers.favouriteTickers[j].tickerId.toString() == tickers[i]._id.toString()){
+                        tickers[i].favourite = true
+                    }
                 }
             }
         })
@@ -80,19 +80,25 @@ router.get("/general/search", auth, async function (req, res) {
 })
 
 router.put("/user/updateTicker", auth, async (req, res) => {
-    User.find({ _id: req.user.id, favouriteTickers: { $in : [req.body.id] }}).then(async userInfo => {
-        console.log(userInfo, 'usaaaa')
+    console.log('in here');
+    console.log(req.body.id, 'idddd');
+    User.find({ _id: req.user.id, "favouriteTickers.tickerId" : req.body.id}).then(async userInfo => {
         if (userInfo.length > 0) {
-            // Add
-            await User.updateOne({ _id: req.user.id }, {$pull: {favouriteTickers: req.body.id} }).then(
+            // Remove
+            await User.updateOne({ _id: req.user.id }, {$pull: { "favouriteTickers": { tickerId: req.body.id}} }).then(
                 res.status(200).json({id: req.body.id, remove: true, message: "Removed From Favourites"})
             )
             .catch(errors => {
                 console.log(errors);
             })
         } else {
-            // Remove
-            await User.updateOne({ _id: req.user.id }, {$addToSet: {favouriteTickers: req.body.id} }).then(
+            // Add
+            await User.updateOne(
+                { _id: req.user.id }, 
+                { $addToSet: {"favouriteTickers": {
+                    ticker: req.body.title,
+                    tickerId: req.body.id
+                }}}).then(
                 res.status(200).json({id: req.body.id, remove: false, message: "Saved as Favourites"})
                 )
                 .catch(errors => {
@@ -104,8 +110,9 @@ router.put("/user/updateTicker", auth, async (req, res) => {
 
 router.get("/user/favStocks", auth, async (req, res) => {
     await User.findOne({ _id: req.user.id }, {favouriteTickers: 1}).then(async tickers => {
+        console.log(tickers, 'tickerss')
         if (tickers) {
-            let objectIdArray = tickers.favouriteTickers.map(s => mongoose.Types.ObjectId(s));
+            let objectIdArray = tickers.favouriteTickers.map(s => mongoose.Types.ObjectId(s.tickerId));
             let stockTickerArray = [];
             await Ticker.find({ _id: { $in: objectIdArray}}).then(tickerList => {
                 tickerList.forEach(ticker => {
@@ -115,7 +122,7 @@ router.get("/user/favStocks", auth, async (req, res) => {
             .catch(errors => {
                 console.log(errors);
             });
-            getStockChartsData(stockTickerArray, res);
+            getStockChartsData(stockTickerArray, res, req, objectIdArray);
         } else {
             res.status(422).json({message: "No favourite stock found"})
         }
